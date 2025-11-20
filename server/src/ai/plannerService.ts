@@ -1,11 +1,11 @@
 import { createHash } from "crypto";
-import { createChatCompletion } from "./openrouterClient";
-import { buildPlannerMessages } from "./plannerPrompt";
 import { PlannerPlan, plannerPlanSchema, WorldSnapshot } from "./schemas";
+import { plannerBackends } from "./backends";
 
 const CACHE_LIMIT = 100;
 
 class PlannerService {
+  private readonly backends = plannerBackends;
   private latestPlan: PlannerPlan | null = null;
   private lastSnapshotHash: string | null = null;
   private lastUpdatedAt: number | null = null;
@@ -61,16 +61,12 @@ class PlannerService {
       return;
     }
 
-    const messages = buildPlannerMessages(snapshot);
     const start = Date.now();
     console.log(
       `[PlannerService] Requesting new plan (tick=${snapshot.tick}, hash=${hash.slice(0, 8)}…)`,
     );
-    const { text } = await createChatCompletion(messages, {
-      timeoutMs: 8000,
-      maxTokens: 256,
-    });
-    console.debug("[PlannerService] Raw planner response:", text);
+    const { text, backendName } = await this.fetchWithBackends(snapshot);
+    console.debug(`[PlannerService] Raw planner response (${backendName}):`, text);
     const parsedPlan = parsePlannerPlan(text);
 
     this.cache.set(hash, parsedPlan);
@@ -85,8 +81,25 @@ class PlannerService {
     this.lastUpdatedAt = Date.now();
     this.lastSnapshotHash = hash;
     console.log(
-      `[PlannerService] Plan updated in ${Math.round(Date.now() - start)}ms (priority=${parsedPlan.priority})`,
+      `[PlannerService] Plan updated in ${Math.round(
+        Date.now() - start,
+      )}ms via ${backendName} (priority=${parsedPlan.priority})`,
     );
+  }
+
+  private async fetchWithBackends(snapshot: WorldSnapshot) {
+    let lastError: unknown = null;
+    for (const backend of this.backends) {
+      try {
+        const text = await backend.plan(snapshot);
+        return { text, backendName: backend.name };
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[PlannerService] Backend ${backend.name} failed: ${message}`);
+      }
+    }
+    throw lastError ?? new Error("No planner backend succeeded");
   }
 }
 

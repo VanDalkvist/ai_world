@@ -1,12 +1,12 @@
 import { Agent } from "@mastra/core/agent";
+import { plannerInstructions } from "./plannerPrompt";
+
+const mastraModel =
+  process.env.MASTRA_MODEL ?? process.env.OPENROUTER_PLANNER_MODEL ?? "openai/gpt-4o-mini";
 
 export const colonyPlanner = new Agent({
   name: "ColonyPlanner",
-  instructions: `Ты планировщик колонии нейросетей.
-Смотри на состояние мира и предлагаешь следующую коллективную цель:
-- "gather" (какой ресурс приоритетен)
-- "buildHub" (где поставить хаб)
-Возвращай компактный JSON.`,
-  model: "openai/gpt-4o-mini",
+  instructions: plannerInstructions,
+  model: mastraModel,
   tools: {},
 });

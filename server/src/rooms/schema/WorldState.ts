@@ -44,4 +44,5 @@ export class WorldState extends Schema {
   @type("number") epoch = 1;
   @type("string") crisisKind: "none" | "storm" | "blackout" | "virus" = "none";
   @type("number") crisisTicksLeft = 0;
+  @type("string") latestPlanPriority: ResourceNode["kind"] | null = null;
 }

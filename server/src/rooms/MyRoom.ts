@@ -62,6 +62,7 @@ export class MyRoom extends Room<WorldState> {
       plannerService.submitSnapshot(snapshot);
     }
     const plan = plannerService.getLatestPlan() ?? buildFallbackPlan(this.state);
+    this.state.latestPlanPriority = plan.priority;
     this.applyAssignments(plan);
 
     for (const a of this.state.agents) {
