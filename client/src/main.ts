@@ -16,6 +16,16 @@ type Metrics = {
   nodes: Record<ResourceKind, number>;
   remaining: Record<ResourceKind, number>;
   priority?: string;
+  megaproject?: {
+    stageName: string;
+    requiredWorkers: number;
+    need: Record<ResourceKind, number>;
+    progress: Record<ResourceKind, number>;
+    workers: number;
+  };
+  policy?: {
+    megQuotaRatio: number;
+  };
 };
 
 class IsoScene extends Phaser.Scene {
@@ -26,6 +36,7 @@ class IsoScene extends Phaser.Scene {
   private resourceSprites = new Map<string, Phaser.GameObjects.Ellipse>();
   private agentSprites = new Map<string, Phaser.GameObjects.Rectangle>();
   private buildingSprites: Phaser.GameObjects.Rectangle[] = [];
+  private megaprojectSprite?: Phaser.GameObjects.Rectangle;
   private mapWidth = 0;
   private mapHeight = 0;
   private mapOffset = new Phaser.Math.Vector2();
@@ -114,6 +125,42 @@ class IsoScene extends Phaser.Scene {
         this.buildingSprites[idx].setPosition(px, py - 18);
       }
     });
+
+    this.renderMegaproject(state);
+  }
+
+  private renderMegaproject(state: any) {
+    const mp = state.megaproject;
+    if (!mp || !mp.stageName) {
+      if (this.megaprojectSprite) {
+        this.megaprojectSprite.destroy();
+        this.megaprojectSprite = undefined;
+      }
+      return;
+    }
+    const { px, py } = this.isoToScreen(mp.siteX, mp.siteY);
+    const totalNeed = mp.need.energy + mp.need.data + mp.need.alloy;
+    const totalProgress = mp.progress.energy + mp.progress.data + mp.progress.alloy;
+    const ratio = totalNeed > 0 ? Phaser.Math.Clamp(totalProgress / totalNeed, 0, 1) : 0;
+    const size = 24 + ratio * 24;
+    const color = Phaser.Display.Color.GetColor(
+      255,
+      Math.floor(80 + 120 * ratio),
+      170 + Math.floor(40 * ratio),
+    );
+
+    if (!this.megaprojectSprite) {
+      this.megaprojectSprite = this.add
+        .rectangle(px, py - 12, size, size, color, 0.8)
+        .setOrigin(0.5)
+        .setAngle(45)
+        .setStrokeStyle(2, 0xffffff);
+    } else {
+      this.megaprojectSprite
+        .setPosition(px, py - 12)
+        .setSize(size, size)
+        .setFillStyle(color, 0.85);
+    }
   }
 
   private emitMetrics(state: any) {
@@ -124,6 +171,8 @@ class IsoScene extends Phaser.Scene {
       remaining[resource.kind as ResourceKind] += resource.amount;
     });
 
+    const megWorkers = state.agents?.filter((agent: any) => agent.taskKind === "megabuild")
+      ?.length ?? 0;
     const metrics: Metrics = {
       tick: state.tick ?? 0,
       map: { width: state.width ?? this.mapWidth, height: state.height ?? this.mapHeight },
@@ -137,6 +186,28 @@ class IsoScene extends Phaser.Scene {
       nodes,
       remaining,
       priority: state.latestPlanPriority ?? undefined,
+      megaproject: state.megaproject
+        ? {
+            stageName: state.megaproject.stageName,
+            requiredWorkers: state.megaproject.requiredWorkers,
+            need: {
+              energy: state.megaproject.need.energy,
+              data: state.megaproject.need.data,
+              alloy: state.megaproject.need.alloy,
+            },
+            progress: {
+              energy: state.megaproject.progress.energy,
+              data: state.megaproject.progress.data,
+              alloy: state.megaproject.progress.alloy,
+            },
+            workers: megWorkers,
+          }
+        : undefined,
+      policy: state.policy
+        ? {
+            megQuotaRatio: state.policy.megQuotaRatio,
+          }
+        : undefined,
     };
 
     this.game.events.emit(METRICS_EVENT, metrics);
@@ -282,14 +353,25 @@ class HudScene extends Phaser.Scene {
     }
     const resLine = (kind: ResourceKind, label: string) =>
       `${label}: ${metrics.nodes[kind]} nodes / ${metrics.remaining[kind]} left`;
-    return [
+    const lines = [
       `Map: ${metrics.map.width} × ${metrics.map.height}`,
       resLine("energy", "Energy"),
       resLine("data", "Data"),
       resLine("alloy", "Alloy"),
       `Stock: ⚡ ${metrics.stock.energy} · ✦ ${metrics.stock.data} · ⛓ ${metrics.stock.alloy}`,
       `Priority: ${metrics.priority ?? "—"}`,
-    ].join("\n");
+    ];
+    if (metrics.megaproject) {
+      const mp = metrics.megaproject;
+      const quota = metrics.policy ? `${Math.round(metrics.policy.megQuotaRatio * 100)}%` : "—";
+      lines.push(
+        "",
+        `Megaproject: ${mp.stageName}`,
+        `Progress: ⚡ ${mp.progress.energy}/${mp.need.energy} · ✦ ${mp.progress.data}/${mp.need.data} · ⛓ ${mp.progress.alloy}/${mp.need.alloy}`,
+        `Workers: ${mp.workers}/${mp.requiredWorkers} | Quota ${quota}`,
+      );
+    }
+    return lines.join("\n");
   }
 }
 
