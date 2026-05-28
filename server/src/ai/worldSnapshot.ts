@@ -16,6 +16,27 @@ export function buildWorldSnapshot(state: WorldState): WorldSnapshot {
       kind: state.crisisKind,
       ticksLeft: state.crisisTicksLeft,
     },
+    megaproject: {
+      stageIndex: state.megaproject.stageIndex,
+      stageName: state.megaproject.stageName,
+      requiredWorkers: state.megaproject.requiredWorkers,
+      need: {
+        energy: state.megaproject.need.energy,
+        data: state.megaproject.need.data,
+        alloy: state.megaproject.need.alloy,
+      },
+      progress: {
+        energy: state.megaproject.progress.energy,
+        data: state.megaproject.progress.data,
+        alloy: state.megaproject.progress.alloy,
+      },
+      siteX: state.megaproject.siteX,
+      siteY: state.megaproject.siteY,
+    },
+    policy: {
+      megQuotaRatio: state.policy.megQuotaRatio,
+      megPressure: state.policy.megPressure,
+    },
     resources: Array.from(state.resources.entries()).map(([id, resource]) => ({
       id,
       kind: resource.kind,
@@ -32,6 +53,7 @@ export function buildWorldSnapshot(state: WorldState): WorldSnapshot {
       alloy: agent.alloy,
       status: agent.status,
       targetId: agent.targetId,
+      taskKind: agent.taskKind,
     })),
     buildings: state.buildings.map((building) => ({
       kind: building.kind,

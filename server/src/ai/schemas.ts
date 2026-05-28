@@ -3,20 +3,37 @@ import { z } from "zod";
 export const resourceKindSchema = z.enum(["energy", "data", "alloy"]);
 export const agentStatusSchema = z.enum(["idle", "moving", "gathering", "building"]);
 
+const resourceBundleSchema = z.object({
+  energy: z.number().int().nonnegative(),
+  data: z.number().int().nonnegative(),
+  alloy: z.number().int().nonnegative(),
+});
+
 export const worldSnapshotSchema = z.object({
   tick: z.number().int().nonnegative(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   epoch: z.number().int().positive(),
-  stock: z.object({
-    energy: z.number().int().nonnegative(),
-    data: z.number().int().nonnegative(),
-    alloy: z.number().int().nonnegative(),
-  }),
+  stock: resourceBundleSchema,
   crisis: z.object({
     kind: z.enum(["none", "storm", "blackout", "virus"]),
     ticksLeft: z.number().int().nonnegative(),
   }),
+  megaproject: z.object({
+    stageIndex: z.number().int().nonnegative(),
+    stageName: z.string(),
+    requiredWorkers: z.number().int().nonnegative(),
+    need: resourceBundleSchema,
+    progress: resourceBundleSchema,
+    siteX: z.number().int(),
+    siteY: z.number().int(),
+  }),
+  policy: z
+    .object({
+      megQuotaRatio: z.number().nonnegative(),
+      megPressure: z.number().nonnegative(),
+    })
+    .optional(),
   resources: z.array(
     z.object({
       id: z.string(),
@@ -36,6 +53,7 @@ export const worldSnapshotSchema = z.object({
       alloy: z.number().int().nonnegative(),
       status: agentStatusSchema,
       targetId: z.string().nullable(),
+      taskKind: z.enum(["idle", "gather", "megabuild"]).optional(),
     }),
   ),
   buildings: z.array(

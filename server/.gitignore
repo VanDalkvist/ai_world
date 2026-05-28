@@ -2,3 +2,5 @@ node_modules
 build
 .colyseus-cloud.json
 .devmode.json
+.DS_Store
+**/.DS_Store
